@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="concurrency_demo_attempt_view_list" model="ir.ui.view">
+        <field name="name">concurrency.demo.attempt.list</field>
+        <field name="model">concurrency.demo.attempt</field>
+        <field name="arch" type="xml">
+            <list create="false" decoration-success="state == 'committed'"
+                  decoration-danger="state == 'rolled_back'">
+                <field name="run_id"/>
+                <field name="scenario_id" optional="hide"/>
+                <field name="request_no"/>
+                <field name="attempt_no"/>
+                <field name="offset_ms"/>
+                <field name="duration_ms"/>
+                <field name="state"/>
+                <field name="error_name"/>
+                <field name="pgcode"/>
+                <field name="wait_ms"/>
+                <field name="note" optional="show"/>
+                <field name="thread_name" optional="hide"/>
+                <field name="retry_log" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_attempt_view_form" model="ir.ui.view">
+        <field name="name">concurrency.demo.attempt.form</field>
+        <field name="model">concurrency.demo.attempt</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="run_id"/>
+                            <field name="scenario_id"/>
+                            <field name="request_no"/>
+                            <field name="attempt_no"/>
+                            <field name="state"/>
+                            <field name="thread_name"/>
+                        </group>
+                        <group>
+                            <field name="offset_ms"/>
+                            <field name="duration_ms"/>
+                            <field name="wait_ms"/>
+                            <field name="retried"/>
+                            <field name="gave_up"/>
+                        </group>
+                    </group>
+                    <group string="Error">
+                        <field name="error_name"/>
+                        <field name="pgcode"/>
+                        <field name="error_type"/>
+                        <field name="error_message"/>
+                        <field name="retry_log"/>
+                        <field name="note"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_attempt_view_search" model="ir.ui.view">
+        <field name="name">concurrency.demo.attempt.search</field>
+        <field name="model">concurrency.demo.attempt</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="scenario_id"/>
+                <field name="run_id"/>
+                <field name="error_name"/>
+                <field name="pgcode"/>
+                <filter name="committed" string="Committed" domain="[('state', '=', 'committed')]"/>
+                <filter name="rolled_back" string="Rolled back" domain="[('state', '=', 'rolled_back')]"/>
+                <filter name="retried" string="Retried" domain="[('retried', '=', True)]"/>
+                <filter name="gave_up" string="Gave up" domain="[('gave_up', '=', True)]"/>
+                <group>
+                    <filter name="group_run" string="Run" context="{'group_by': 'run_id'}"/>
+                    <filter name="group_scenario" string="Scenario" context="{'group_by': 'scenario_id'}"/>
+                    <filter name="group_error" string="Error" context="{'group_by': 'error_name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_attempt_action" model="ir.actions.act_window">
+        <field name="name">Attempt log</field>
+        <field name="res_model">concurrency.demo.attempt</field>
+        <field name="path">retry-demo-attempts</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_run': 1}</field>
+    </record>
+
+</odoo>

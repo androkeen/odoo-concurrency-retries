@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_concurrency_demo_scenario_group_system,concurrency.demo.scenario.group.system,model_concurrency_demo_scenario,base.group_system,1,1,1,1
+access_concurrency_demo_row_group_system,concurrency.demo.row.group.system,model_concurrency_demo_row,base.group_system,1,1,1,1
+access_concurrency_demo_run_group_system,concurrency.demo.run.group.system,model_concurrency_demo_run,base.group_system,1,1,1,1
+access_concurrency_demo_attempt_group_system,concurrency.demo.attempt.group.system,model_concurrency_demo_attempt,base.group_system,1,1,1,1
+access_concurrency_demo_external_call_group_system,concurrency.demo.external.call.group.system,model_concurrency_demo_external_call,base.group_system,1,1,1,1
+access_concurrency_demo_outbox_group_system,concurrency.demo.outbox.group.system,model_concurrency_demo_outbox,base.group_system,1,1,1,1
+access_concurrency_demo_ledger_group_system,concurrency.demo.ledger.group.system,model_concurrency_demo_ledger,base.group_system,1,1,1,1

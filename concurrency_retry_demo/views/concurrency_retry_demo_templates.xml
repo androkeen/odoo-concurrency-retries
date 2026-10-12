@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="upload_page" name="Retry Demo: uploads">
+        <t t-call="web.frontend_layout">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+            <t t-set="title">Retry Demo: uploads</t>
+            <div class="container py-4">
+                <h1>Uploaded files and retries</h1>
+                <p class="text-muted">
+                    Each form uploads a file to a controller that hits a serialization failure on its
+                    first attempt. Before it retries, <code>retrying()</code> rewinds every file in
+                    <code>request.httprequest.files</code>, or raises <code>RuntimeError</code> when a
+                    stream cannot seek. It does that before it looks at the error, so the third form
+                    gets the <code>RuntimeError</code> instead of the usual validation message.
+                </p>
+                <div class="row g-3">
+                    <div t-foreach="modes" t-as="mode" class="col-md-4">
+                        <form method="post" enctype="multipart/form-data" class="card h-100"
+                              action="/concurrency_retry_demo/upload">
+                            <div class="card-body">
+                                <h5 class="card-title" t-out="modes[mode]"/>
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <input type="hidden" name="mode" t-att-value="mode"/>
+                                <input type="file" name="upload" class="form-control mb-3" required="required"/>
+                                <button type="submit" class="btn btn-primary">Upload</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <h2 class="mt-5">Last run</h2>
+                <p t-if="not run" class="text-muted">No run yet.</p>
+                <t t-if="run">
+                    <p>
+                        <span t-out="run.variant"/>:
+                        <strong t-field="run.outcome"/>,
+                        <span t-out="run.attempt_count"/> attempt(s).
+                        <a href="/odoo/retry-demo">Back to the scenarios</a>
+                    </p>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Attempt</th>
+                                <th>State</th>
+                                <th>Error</th>
+                                <th>SQLSTATE</th>
+                                <th>Backoff (ms)</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="run.attempt_ids" t-as="attempt">
+                                <td t-out="attempt.attempt_no"/>
+                                <td><span t-field="attempt.state"/></td>
+                                <td t-out="attempt.error_name or attempt.error_type or ''"/>
+                                <td t-out="attempt.pgcode or ''"/>
+                                <td t-out="attempt.wait_ms or ''"/>
+                                <td t-out="attempt.note or ''"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </t>
+            </div>
+        </t>
+    </template>
+
+</odoo>

@@ -1,0 +1,32 @@
+# How many times does one call run when the method always raises 40001?
+# Captured 2026-10-12.
+
+## Odoo 17.0 (local checkout 69abc02; same code as 17.0 head bf7355f for the files involved)
+# Probe: experiments/odoo17_entry_points/bp425_probe, scratch database bp425_probe17,
+# threaded server, --db-filter=^bp425_probe17$ (one database, so /xmlrpc is served
+# by _serve_db and its HTTP retry loop). The probe shortens retrying()'s backoff to
+# 10 ms; the counts are unaffected.
+
+17.0 XML-RPC /xmlrpc/2/object : 25 executions (0.8 s)
+17.0 JSON-RPC /jsonrpc       : 25 executions (error: True)
+17.0 web /web/dataset/call_kw: 5 executions (error: True)
+17.0 cron Run Manually       : 5 executions (error: True)
+
+# Server log: 70 "odoo.service.model: SERIALIZATION_FAILURE" lines
+# = XML-RPC (5 inner loops x 5 lines + 5 outer lines) + JSON-RPC (30) + call_kw (5) + Run Manually (5).
+
+## Odoo 19.0 (e6ebad8), demo module, normal backoff
+# concurrency.demo.scenario.action_serialization_failure called through
+# /xmlrpc/2/object, with failing_attempts=6 (every attempt meets a concurrent writer).
+
+fault: psycopg2.errors.SerializationFailure: could not serialize access due to concurrent update
+elapsed 19.0 s
+runs: [(32, 5, 'failed')]
+total attempts: 5
+
+# Server log: 4 "tries left" lines + 1 "maximum number of tries reached!" line, then
+# "Exception during request handling" from the HTTP layer: the outer loop re-raised at
+# once because rpc/_check_request() had closed the request cursor (model.py:193).
+
+## Odoo 19.0, demo module: 'Run Manually' on the contended job
+# See evidence/run_scenarios.txt, section "Cron, Run Manually": 1 attempt, failure_count=1.

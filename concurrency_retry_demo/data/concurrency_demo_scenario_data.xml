@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1. Serialization failure -->
+    <record id="scenario_serialization" model="concurrency.demo.scenario">
+        <field name="sequence">10</field>
+        <field name="kind">serialization</field>
+        <field name="name">Serialization failure</field>
+        <field name="summary">A concurrent update fails the first attempts with 40001; a retry succeeds.</field>
+        <field name="failing_attempts">2</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="description" type="html">
+            <p>Another user updates the row and commits while this request waits for the row lock.
+            Under REPEATABLE READ a transaction may not overwrite a row that changed after its
+            snapshot, so PostgreSQL raises <code>40001 could not serialize access due to concurrent
+            update</code>. <code>retrying()</code> rolls back, sleeps a random time and runs the whole
+            call again; the next attempt has a fresh snapshot and succeeds.</p>
+            <p><b>Look at:</b> the first attempts rolled back with SERIALIZATION_FAILURE, each with a
+            backoff below 2 s, then 4 s; the last attempt committed. The row gains 100 from you and
+            1 from each competing update.</p>
+        </field>
+    </record>
+    <record id="row_serialization_target" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_serialization"/>
+        <field name="key">target</field>
+        <field name="name">Shared row</field>
+    </record>
+
+    <!-- 2. Deadlock -->
+    <record id="scenario_deadlock" model="concurrency.demo.scenario">
+        <field name="sequence">20</field>
+        <field name="kind">deadlock</field>
+        <field name="name">Deadlock</field>
+        <field name="summary">Two flows lock rows A and B in opposite orders: 40P01.</field>
+        <field name="failing_attempts">1</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="description" type="html">
+            <p>This request locks row A then row B; a background flow locks B then A. Each waits for
+            the other. After <code>deadlock_timeout</code> (1 s by default) PostgreSQL aborts one of
+            them with <code>40P01 deadlock detected</code>. The request started waiting first, so its
+            deadlock check runs first and it is the victim; <code>retrying()</code> runs it again.</p>
+            <p><b>Look at:</b> attempt 1 rolled back with DEADLOCK_DETECTED after about
+            <code>deadlock_timeout</code>, attempt 2 committed. The fix is to lock rows in the same
+            order in every code path.</p>
+        </field>
+    </record>
+    <record id="row_deadlock_a" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_deadlock"/>
+        <field name="sequence">1</field>
+        <field name="key">a</field>
+        <field name="name">Row A</field>
+    </record>
+    <record id="row_deadlock_b" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_deadlock"/>
+        <field name="sequence">2</field>
+        <field name="key">b</field>
+        <field name="name">Row B</field>
+    </record>
+
+    <!-- 3. Lock not available -->
+    <record id="scenario_lock_not_available" model="concurrency.demo.scenario">
+        <field name="sequence">30</field>
+        <field name="kind">lock_not_available</field>
+        <field name="name">Lock not available</field>
+        <field name="summary">FOR UPDATE NOWAIT against a held lock: 55P03, retried until the lock is gone.</field>
+        <field name="hold_seconds">3.0</field>
+        <field name="description" type="html">
+            <p>Another transaction holds a lock on the row for a few seconds.
+            <code>SELECT ... FOR UPDATE NOWAIT</code> fails at once with <code>55P03 could not obtain
+            lock on row</code> instead of waiting, and <code>retrying()</code> tries again with a growing
+            random backoff until the lock is released. Odoo 19 uses NOWAIT on purpose in no-gap
+            sequences, loyalty codes, POS session opening and Studio approvals.</p>
+            <p><b>Look at:</b> rolled-back attempts with LOCK_NOT_AVAILABLE, then a commit. With an
+            unlucky draw of short backoffs the five attempts can all fall inside the lock: that is the
+            exhaustion case.</p>
+            <p><b>ORM lock_for_update():</b> the 19.0 helper locks with <code>SKIP LOCKED</code> and
+            raises <code>LockError</code>, a <code>UserError</code>: one attempt, no retry, the user
+            gets "Cannot grab a lock on records".</p>
+        </field>
+    </record>
+    <record id="row_lock_target" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_lock_not_available"/>
+        <field name="key">target</field>
+        <field name="name">Locked row</field>
+    </record>
+
+    <!-- 4. Exhaust retries -->
+    <record id="scenario_exhaust" model="concurrency.demo.scenario">
+        <field name="sequence">40</field>
+        <field name="kind">exhaust</field>
+        <field name="name">Exhaust retries</field>
+        <field name="summary">A row stays hot longer than all five attempts: the error reaches the user.</field>
+        <field name="hold_seconds">45.0</field>
+        <field name="description" type="html">
+            <p>A background writer updates and commits the row many times a second for up to 45 s.
+            Each attempt reads the row, works for 0.3 s and writes it back: 40001 every time. After the
+            fifth failure <code>retrying()</code> logs <code>maximum number of tries reached!</code> and
+            the error reaches the user.</p>
+            <p><b>Look at:</b> five rolled-back attempts, four backoffs bounded by 2, 4, 8 and 16 s,
+            no backoff after the fifth. Expect about 15 s of waiting on average, about 30 s at worst,
+            plus the time of the attempts themselves.</p>
+        </field>
+    </record>
+    <record id="row_exhaust_target" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_exhaust"/>
+        <field name="key">target</field>
+        <field name="name">Hot row</field>
+    </record>
+
+    <!-- 5. Unique violation -->
+    <record id="scenario_unique_violation" model="concurrency.demo.scenario">
+        <field name="sequence">50</field>
+        <field name="kind">unique_violation</field>
+        <field name="name">Unique violation</field>
+        <field name="summary">An IntegrityError becomes a ValidationError at the first attempt, never retried.</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="description" type="html">
+            <p>Two users create a row with the same unique code at the same moment. Our check finds
+            nothing (the other row is not in our snapshot), our INSERT waits for the other transaction
+            and then fails with <code>23505 duplicate key value violates unique constraint</code>. That
+            is an <code>IntegrityError</code>: <code>retrying()</code> rolls back and raises a
+            <code>ValidationError</code> with the constraint message at once. It never retries it, even
+            though a retry would have found the row.</p>
+            <p><b>Get or create, ConcurrencyError:</b> the code catches the violation and raises
+            <code>odoo.exceptions.ConcurrencyError</code>, new in 19.0 and retried like 40001: attempt 2
+            finds the row and updates it. Enterprise <code>account_invoice_extract</code> does the same
+            for partners created by OCR.</p>
+        </field>
+    </record>
+
+    <!-- 6. Unsafe side effect -->
+    <record id="scenario_unsafe_side_effect" model="concurrency.demo.scenario">
+        <field name="sequence">60</field>
+        <field name="kind">unsafe_side_effect</field>
+        <field name="name">Unsafe side effect</field>
+        <field name="summary">An external call made inside the transaction runs once per attempt.</field>
+        <field name="failing_attempts">2</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="description" type="html">
+            <p>Confirming the order sends the confirmation (an email, an API call) straight away,
+            inside the transaction. The ORM writes the order at the flush, which
+            <code>retrying()</code> runs after the method returned: the UPDATE meets a concurrent edit
+            and fails with 40001. Every attempt had already sent its message, and nothing takes it
+            back.</p>
+            <p><b>Look at:</b> one confirmed order, one external call per attempt in Outside world.</p>
+            <p><b>Confirm order, cr.commit() midway:</b> the code commits after confirming the order,
+            then a later write meets the conflict. <code>retrying()</code> can only roll back what came
+            after the commit, so each retry confirms the order again: its value grows by one per
+            attempt.</p>
+        </field>
+    </record>
+    <record id="row_unsafe_order" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_unsafe_side_effect"/>
+        <field name="sequence">1</field>
+        <field name="key">order</field>
+        <field name="name">Order SO042</field>
+    </record>
+    <record id="row_unsafe_stats" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_unsafe_side_effect"/>
+        <field name="sequence">2</field>
+        <field name="key">stats</field>
+        <field name="name">Customer statistics</field>
+    </record>
+
+    <!-- 7. Safe side effect -->
+    <record id="scenario_safe_side_effect" model="concurrency.demo.scenario">
+        <field name="sequence">70</field>
+        <field name="kind">safe_side_effect</field>
+        <field name="name">Safe side effect</field>
+        <field name="summary">The same flow with cr.postcommit or an outbox: one external call per click.</field>
+        <field name="failing_attempts">2</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="description" type="html">
+            <p><b>Confirm order (postcommit):</b> the call is registered with
+            <code>self.env.cr.postcommit.add(...)</code>. The rollback of a failed attempt clears the
+            queue, so the call runs once, after the commit. If it fails then, the order stays
+            confirmed: nothing retries the call.</p>
+            <p><b>Confirm order (outbox):</b> the message is a row written in the same transaction; a
+            failed attempt rolls it back with the order. <b>Deliver outbox</b> plays the worker: it
+            sends each pending message with its idempotency key, at least once. Tick <i>Crash after
+            delivery</i>, deliver, untick, deliver again: the receiver gets the message twice and
+            ignores the second copy.</p>
+        </field>
+    </record>
+    <record id="row_safe_order" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_safe_side_effect"/>
+        <field name="key">order</field>
+        <field name="name">Order SO043</field>
+    </record>
+
+    <!-- 8. Counter drift vs atomic update -->
+    <record id="scenario_counter" model="concurrency.demo.scenario">
+        <field name="sequence">80</field>
+        <field name="kind">counter</field>
+        <field name="name">Counter drift vs atomic update</field>
+        <field name="summary">Eight simultaneous increments: where updates get lost, and where they only retry.</field>
+        <field name="concurrent_requests">8</field>
+        <field name="description" type="html">
+            <p>Each button sends simultaneous requests that add 1 to the same counter, each in its own
+            thread and cursor and through the real <code>retrying()</code>, as an RPC call would.</p>
+            <ul>
+                <li><b>Read-modify-write</b> and <b>SET value = value + 1</b>: under REPEATABLE READ
+                neither loses an update inside one transaction. Both conflict with 40001 and retry; the
+                atomic UPDATE only has a smaller conflict window.</li>
+                <li><b>Stale form value</b>: the value was read in an earlier transaction, like a form
+                loaded before the save. The saves do not overlap, so there is no error and no retry,
+                and the counter ends well below the number of requests.</li>
+                <li><b>Insert-only ledger</b>: one row per increment, nothing to conflict on.</li>
+            </ul>
+            <p><b>Look at:</b> the note <i>expected +8, got +N</i> and the retries of each run.</p>
+        </field>
+    </record>
+    <record id="row_counter" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_counter"/>
+        <field name="key">counter</field>
+        <field name="name">Counter</field>
+    </record>
+
+    <!-- 9. Same failure from cron -->
+    <record id="scenario_cron" model="concurrency.demo.scenario">
+        <field name="sequence">90</field>
+        <field name="kind">cron</field>
+        <field name="name">Same failure from cron</field>
+        <field name="summary">The 40001 of the first scenario, in a scheduled action: no retry.</field>
+        <field name="hold_seconds">1.0</field>
+        <field name="cron_id" ref="ir_cron_contended_job"/>
+        <field name="batched_cron_id" ref="ir_cron_contended_batched_job"/>
+        <field name="description" type="html">
+            <p>The job hits the conflict of the first scenario. <code>ir.cron</code> does not call
+            <code>retrying()</code>: the job fails at once, the error is logged, the failure count goes
+            up and the job waits for its next call.</p>
+            <ul>
+                <li><b>Run Manually</b>: in 19.0 the button runs the job like the scheduler does, on its
+                own cursor, so there is no retry either (17.0 ran it inside the HTTP request, which
+                retried it).</li>
+                <li><b>Trigger the cron worker</b>: the real scheduler path. It needs a cron thread
+                (<code>max_cron_threads</code> &gt; 0) working on this database.</li>
+                <li><b>Batched job</b>: the job commits its progress after each row with
+                <code>_commit_progress()</code>. When it fails after committing some progress, ir.cron
+                runs it again at once, without backoff, and it ends fully done.</li>
+                <li><b>Pretend a week of failures</b>: the next failure deactivates the job (19.0:
+                5 consecutive failures spanning more than 7 days).</li>
+            </ul>
+        </field>
+    </record>
+    <record id="row_cron_target" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_cron"/>
+        <field name="sequence">1</field>
+        <field name="key">target</field>
+        <field name="name">Shared row</field>
+    </record>
+    <record id="row_cron_batch_1" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_cron"/>
+        <field name="sequence">2</field>
+        <field name="key">batch_1</field>
+        <field name="name">Batch row 1</field>
+    </record>
+    <record id="row_cron_batch_2" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_cron"/>
+        <field name="sequence">3</field>
+        <field name="key">batch_2</field>
+        <field name="name">Batch row 2</field>
+    </record>
+    <record id="row_cron_batch_3" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_cron"/>
+        <field name="sequence">4</field>
+        <field name="key">batch_3</field>
+        <field name="name">Batch row 3</field>
+    </record>
+
+    <!-- 10. Non-seekable upload -->
+    <record id="scenario_upload" model="concurrency.demo.scenario">
+        <field name="sequence">100</field>
+        <field name="kind">upload</field>
+        <field name="name">Non-seekable upload</field>
+        <field name="summary">retrying() rewinds uploaded files before it retries, or raises RuntimeError.</field>
+        <field name="hold_seconds">0.5</field>
+        <field name="description" type="html">
+            <p>A controller reads an uploaded file, then hits a serialization failure. Before the
+            retry, <code>retrying()</code> rewinds each file of <code>request.httprequest.files</code>,
+            or raises <code>RuntimeError: Cannot retry request on input file ... after serialization
+            failure</code> when the stream cannot seek.</p>
+            <p>The check runs before the error is classified: with a unique violation (never retried)
+            the user still gets the <code>RuntimeError</code> instead of the validation message.</p>
+        </field>
+    </record>
+    <record id="row_upload_target" model="concurrency.demo.row">
+        <field name="scenario_id" ref="scenario_upload"/>
+        <field name="key">target</field>
+        <field name="name">Upload counter</field>
+        <field name="code">UPLOAD-TARGET</field>
+    </record>
+
+</odoo>

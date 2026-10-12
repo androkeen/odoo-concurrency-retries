@@ -1,0 +1,34 @@
+# OCA queue_job 19.0.2.1.6 on Odoo 19.0 (e6ebad8): what happens to a job that
+# raises 40001, and to one that raises odoo.exceptions.ConcurrencyError?
+# Captured 2026-10-12.
+#
+# Probe: experiments/queue_job_19/bp425_probe, scratch database bp425_probe19,
+# threaded server with --load=base,rpc,web,queue_job (job runner thread on),
+# channel root:1. Both jobs enqueued with max_retries=3.
+# Columns: job state, retry counter / max_retries, exception name, and how many
+# times each job function actually ran.
+
+t=  0.0s fail_concurrency_error: pending retry=0/3  | fail_serialization: enqueued retry=0/3  | runs 40001=1 concurrency=0
+t=  1.1s fail_concurrency_error: failed retry=1/3 odoo.exceptions.ConcurrencyError | fail_serialization: pending retry=1/3  | runs 40001=1 concurrency=1
+t=  5.1s fail_concurrency_error: failed retry=1/3 odoo.exceptions.ConcurrencyError | fail_serialization: pending retry=2/3  | runs 40001=2 concurrency=1
+t= 10.2s ... fail_serialization: pending retry=3/3  | runs 40001=3
+t= 15.3s ... fail_serialization: pending retry=4/3  | runs 40001=4
+t= 20.3s ... fail_serialization: pending retry=5/3  | runs 40001=5
+t= 25.4s ... fail_serialization: pending retry=6/3  | runs 40001=6
+t= 30.5s ... fail_serialization: pending retry=7/3  | runs 40001=7
+t= 35.6s ... fail_serialization: pending retry=8/3  | runs 40001=8
+t= 40.6s ... fail_serialization: pending retry=9/3  | runs 40001=9
+t= 45.7s ... fail_serialization: pending retry=10/3 | runs 40001=10
+
+final: fail_concurrency_error('qj_concurrency') | failed  | retry 1/3  | exc_name odoo.exceptions.ConcurrencyError
+final: fail_serialization('qj_40001')          | pending | retry 11/3 | eta +5 s, no exception recorded
+
+# Server log, ConcurrencyError job (the HTTP retry around /queue_job/runjob):
+INFO  odoo.service.model: ConcurrencyError('probe: someone was faster'), 4 tries left, try again in 1.5018 sec...
+WARNING odoo.addons.queue_job.controllers.main: was requested to run job 5be83689-..., but it does not exist, or is not in state enqueued, or is being handled by another worker
+# Server log, 40001 job: only werkzeug access lines every 5 s
+# ("GET /queue_job/runjob?job_uuid=9633d01a-... HTTP/1.1" 200); queue_job logs the
+# postpone at DEBUG level, so nothing about the conflict shows at INFO.
+
+# Side finding: --load replaces the 19.0 default server-wide modules (base,rpc,web).
+# With --load=base,web,queue_job, /xmlrpc/2/common answered 404 NOT FOUND.

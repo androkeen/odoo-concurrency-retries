@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="concurrency_retry_demo_menu_root"
+              name="Retry Demo"
+              web_icon="fa fa-refresh,#FFFFFF,#714B67"
+              groups="base.group_system"
+              sequence="200"/>
+
+    <menuitem id="concurrency_demo_scenario_menu"
+              name="Scenarios"
+              parent="concurrency_retry_demo_menu_root"
+              action="concurrency_demo_scenario_action"
+              sequence="10"/>
+
+    <menuitem id="concurrency_demo_run_menu"
+              name="Runs"
+              parent="concurrency_retry_demo_menu_root"
+              action="concurrency_demo_run_action"
+              sequence="20"/>
+
+    <menuitem id="concurrency_demo_attempt_menu"
+              name="Attempt Log"
+              parent="concurrency_retry_demo_menu_root"
+              action="concurrency_demo_attempt_action"
+              sequence="30"/>
+
+    <menuitem id="concurrency_demo_external_call_menu"
+              name="Outside World"
+              parent="concurrency_retry_demo_menu_root"
+              action="concurrency_demo_external_call_action"
+              sequence="40"/>
+
+</odoo>

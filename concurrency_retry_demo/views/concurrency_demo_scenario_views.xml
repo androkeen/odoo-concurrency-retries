@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="concurrency_demo_scenario_view_kanban" model="ir.ui.view">
+        <field name="name">concurrency.demo.scenario.kanban</field>
+        <field name="model">concurrency.demo.scenario</field>
+        <field name="arch" type="xml">
+            <kanban create="false" delete="false">
+                <templates>
+                    <t t-name="card">
+                        <field name="name" class="fw-bold fs-5"/>
+                        <field name="summary" class="text-muted"/>
+                        <footer class="pt-2">
+                            <field name="kind" widget="badge"/>
+                            <field name="last_run_outcome" widget="badge" class="ms-auto"
+                                   decoration-success="last_run_outcome == 'committed'"
+                                   decoration-danger="last_run_outcome == 'failed'"
+                                   decoration-warning="last_run_outcome in ('partial', 'running')"/>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_scenario_view_list" model="ir.ui.view">
+        <field name="name">concurrency.demo.scenario.list</field>
+        <field name="model">concurrency.demo.scenario</field>
+        <field name="arch" type="xml">
+            <list create="false" delete="false">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="summary"/>
+                <field name="last_run_outcome" widget="badge"
+                       decoration-success="last_run_outcome == 'committed'"
+                       decoration-danger="last_run_outcome == 'failed'"
+                       decoration-warning="last_run_outcome in ('partial', 'running')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_scenario_view_form" model="ir.ui.view">
+        <field name="name">concurrency.demo.scenario.form</field>
+        <field name="model">concurrency.demo.scenario</field>
+        <field name="arch" type="xml">
+            <form create="false" delete="false">
+                <header>
+                    <button name="action_serialization_failure" type="object" string="Run"
+                            class="btn-primary" invisible="kind != 'serialization'"/>
+                    <button name="action_deadlock" type="object" string="Run"
+                            class="btn-primary" invisible="kind != 'deadlock'"/>
+                    <button name="action_lock_not_available" type="object" string="FOR UPDATE NOWAIT"
+                            class="btn-primary" invisible="kind != 'lock_not_available'"/>
+                    <button name="action_lock_for_update" type="object" string="ORM lock_for_update()"
+                            invisible="kind != 'lock_not_available'"/>
+                    <button name="action_exhaust_retries" type="object" string="Run (up to 30 s)"
+                            class="btn-primary" invisible="kind != 'exhaust'"/>
+                    <button name="action_unique_violation" type="object" string="Check, then create()"
+                            class="btn-primary" invisible="kind != 'unique_violation'"/>
+                    <button name="action_unique_get_or_create" type="object"
+                            string="Get or create, ConcurrencyError"
+                            invisible="kind != 'unique_violation'"/>
+                    <button name="action_unsafe_side_effect" type="object" string="Confirm order"
+                            class="btn-primary" invisible="kind != 'unsafe_side_effect'"/>
+                    <button name="action_commit_midway" type="object"
+                            string="Confirm order, cr.commit() midway"
+                            invisible="kind != 'unsafe_side_effect'"/>
+                    <button name="action_safe_side_effect" type="object" string="Confirm order (postcommit)"
+                            class="btn-primary" invisible="kind != 'safe_side_effect'"/>
+                    <button name="action_outbox_side_effect" type="object" string="Confirm order (outbox)"
+                            invisible="kind != 'safe_side_effect'"/>
+                    <button name="action_process_outbox" type="object" string="Deliver outbox"
+                            invisible="kind != 'safe_side_effect'"/>
+                    <button name="action_counter_orm" type="object" string="Read-modify-write"
+                            class="btn-primary" invisible="kind != 'counter'"/>
+                    <button name="action_counter_atomic" type="object" string="SET value = value + 1"
+                            invisible="kind != 'counter'"/>
+                    <button name="action_counter_stale" type="object" string="Stale form value"
+                            invisible="kind != 'counter'"/>
+                    <button name="action_counter_ledger" type="object" string="Insert-only ledger"
+                            invisible="kind != 'counter'"/>
+                    <button name="action_cron_run_manually" type="object" string="Run Manually"
+                            class="btn-primary" invisible="kind != 'cron'"/>
+                    <button name="action_cron_trigger" type="object" string="Trigger the cron worker"
+                            invisible="kind != 'cron'"/>
+                    <button name="action_cron_batched" type="object" string="Batched job"
+                            invisible="kind != 'cron'"/>
+                    <button name="action_cron_fake_failure_history" type="object"
+                            string="Pretend a week of failures" invisible="kind != 'cron'"/>
+                    <button name="action_open_upload_page" type="object" string="Open the upload page"
+                            class="btn-primary" invisible="kind != 'upload'"/>
+                    <button name="action_reset" type="object" string="Reset"
+                            confirm="Delete the runs of this scenario and reset its rows?"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <field name="summary" readonly="1"/>
+                    </div>
+                    <field name="kind" invisible="1"/>
+                    <group>
+                        <group string="Settings">
+                            <field name="failing_attempts"
+                                   invisible="kind not in ('serialization', 'deadlock', 'unsafe_side_effect', 'safe_side_effect')"/>
+                            <field name="hold_seconds" invisible="kind == 'counter'"/>
+                            <field name="concurrent_requests" invisible="kind != 'counter'"/>
+                            <field name="simulate_crash" invisible="kind != 'safe_side_effect'"/>
+                        </group>
+                        <group string="Last run">
+                            <field name="last_run_id"/>
+                            <field name="last_run_outcome" widget="badge"
+                                   decoration-success="last_run_outcome == 'committed'"
+                                   decoration-danger="last_run_outcome == 'failed'"
+                                   decoration-warning="last_run_outcome in ('partial', 'running')"/>
+                            <field name="last_run_attempt_count"/>
+                            <field name="last_run_retry_count"/>
+                            <field name="last_run_external_call_count"
+                                   invisible="kind not in ('unsafe_side_effect', 'safe_side_effect')"/>
+                            <field name="last_run_note" invisible="not last_run_note"/>
+                        </group>
+                    </group>
+                    <group string="Scheduled actions" invisible="kind != 'cron'">
+                        <group>
+                            <field name="cron_id"/>
+                            <field name="cron_active"/>
+                            <field name="cron_failure_count"/>
+                            <field name="cron_first_failure_date"/>
+                        </group>
+                        <group>
+                            <field name="cron_nextcall"/>
+                            <field name="cron_lastcall"/>
+                            <field name="batched_cron_id"/>
+                            <field name="batched_cron_failure_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="How it works" name="description">
+                            <field name="description" readonly="1"/>
+                        </page>
+                        <page string="Last run" name="last_run">
+                            <field name="last_run_attempt_ids">
+                                <list decoration-success="state == 'committed'"
+                                      decoration-danger="state == 'rolled_back'">
+                                    <field name="request_no" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="attempt_no"/>
+                                    <field name="offset_ms"/>
+                                    <field name="duration_ms"/>
+                                    <field name="state"/>
+                                    <field name="error_name"/>
+                                    <field name="pgcode"/>
+                                    <field name="wait_ms"/>
+                                    <field name="note" optional="show"/>
+                                    <field name="error_message" optional="hide"/>
+                                    <field name="retry_log" optional="hide"/>
+                                    <field name="thread_name" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Rows" name="rows">
+                            <field name="row_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="code" optional="show"/>
+                                    <field name="value"/>
+                                    <field name="ledger_total" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="total" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="processed" column_invisible="parent.kind != 'cron'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Outside world" name="external_calls"
+                              invisible="kind not in ('unsafe_side_effect', 'safe_side_effect')">
+                            <field name="external_call_ids">
+                                <list decoration-muted="is_duplicate">
+                                    <field name="received_at"/>
+                                    <field name="run_id"/>
+                                    <field name="attempt_no"/>
+                                    <field name="channel"/>
+                                    <field name="payload"/>
+                                    <field name="idempotency_key" optional="show"/>
+                                    <field name="is_duplicate"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Outbox" name="outbox" invisible="kind != 'safe_side_effect'">
+                            <field name="outbox_ids" readonly="1">
+                                <list decoration-muted="state == 'sent'">
+                                    <field name="create_date"/>
+                                    <field name="run_id"/>
+                                    <field name="payload"/>
+                                    <field name="idempotency_key"/>
+                                    <field name="state"/>
+                                    <field name="sent_at"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="All runs" name="runs">
+                            <field name="run_ids">
+                                <list>
+                                    <field name="id"/>
+                                    <field name="create_date"/>
+                                    <field name="variant"/>
+                                    <field name="channel"/>
+                                    <field name="outcome" widget="badge"
+                                           decoration-success="outcome == 'committed'"
+                                           decoration-danger="outcome == 'failed'"
+                                           decoration-warning="outcome in ('partial', 'running')"/>
+                                    <field name="request_count" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="attempt_count"/>
+                                    <field name="retry_count"/>
+                                    <field name="external_call_count"
+                                           column_invisible="parent.kind not in ('unsafe_side_effect', 'safe_side_effect')"/>
+                                    <field name="value_before" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="value_after" column_invisible="parent.kind != 'counter'"/>
+                                    <field name="note" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_scenario_view_search" model="ir.ui.view">
+        <field name="name">concurrency.demo.scenario.search</field>
+        <field name="model">concurrency.demo.scenario</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="kind"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_scenario_action" model="ir.actions.act_window">
+        <field name="name">Retry scenarios</field>
+        <field name="res_model">concurrency.demo.scenario</field>
+        <field name="path">retry-demo</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+
+</odoo>

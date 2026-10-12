@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Active, but scheduled far away: they only run when the demo asks. -->
+    <record id="ir_cron_contended_job" model="ir.cron">
+        <field name="name">Retry Demo: contended job</field>
+        <field name="model_id" ref="model_concurrency_demo_scenario"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_contended_job()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall" eval="(DateTime.now() + relativedelta(years=10)).strftime('%Y-%m-%d %H:%M:%S')"/>
+    </record>
+
+    <record id="ir_cron_contended_batched_job" model="ir.cron">
+        <field name="name">Retry Demo: batched job with progress</field>
+        <field name="model_id" ref="model_concurrency_demo_scenario"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_contended_batched_job()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall" eval="(DateTime.now() + relativedelta(years=10)).strftime('%Y-%m-%d %H:%M:%S')"/>
+    </record>
+
+</odoo>

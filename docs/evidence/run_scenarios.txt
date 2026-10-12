@@ -1,0 +1,193 @@
+# scripts/run_scenarios.py, all scenarios, on a freshly installed database (bp425_retry_fresh)
+# Odoo 19.0 EE @ odoo e6ebad8, threaded server (--workers=0 --max-cron-threads=1), PostgreSQL deadlock_timeout=1s
+# 2026-10-12T14:29:01Z
+
+### Serialization failure [action_serialization_failure] (5.6 s)
+    run #27 Concurrent update: committed, 3 attempt(s), 2 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1012  rolled_back  SERIALIZATION_FAILURE    40001           1436  
+      2      2456    1013  rolled_back  SERIALIZATION_FAILURE    40001           2072  
+      3      5549      15  committed                                                   
+
+### Deadlock [action_deadlock] (1.6 s)
+    run #28 A then B, against B then A: committed, 2 attempt(s), 1 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  DEADLOCK_DETECTED        40P01            548  
+      2      1571      12  committed                                                   
+
+### Lock not available [action_lock_not_available] (6.8 s)
+    run #29 FOR UPDATE NOWAIT: committed, 4 attempt(s), 3 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0       9  rolled_back  LOCK_NOT_AVAILABLE       55P03            800  
+      2       818       9  rolled_back  LOCK_NOT_AVAILABLE       55P03           2076  
+      3      2912       9  rolled_back  LOCK_NOT_AVAILABLE       55P03           3825  
+      4      6755      13  committed                                                   
+
+### Lock not available, ORM lock_for_update() [action_lock_for_update] (0.0 s)
+    user sees: odoo.exceptions.LockError: Cannot grab a lock on records
+    run #30 ORM lock_for_update(): failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0      12  rolled_back  LockError                                      
+
+### Exhaust retries [action_exhaust_retries] (24.2 s)
+    user sees: psycopg2.errors.SerializationFailure: could not serialize access due to concurrent update
+    run #31 Hot row: failed, 5 attempt(s), 4 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0     311  rolled_back  SERIALIZATION_FAILURE    40001            301  
+      2       622     309  rolled_back  SERIALIZATION_FAILURE    40001           3140  
+      3      4081     310  rolled_back  SERIALIZATION_FAILURE    40001           3707  
+      4      8107     309  rolled_back  SERIALIZATION_FAILURE    40001          15468  
+      5     23894     310  rolled_back  SERIALIZATION_FAILURE    40001        gave up  
+
+### Unique violation [action_unique_violation] (1.0 s)
+    user sees: odoo.exceptions.ValidationError: The operation cannot be completed: Another row already uses this code.
+    run #32 Check, then create(): failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  UNIQUE_VIOLATION         23505                 
+
+### Unique violation, ConcurrencyError [action_unique_get_or_create] (1.2 s)
+    run #33 Get or create, ConcurrencyError: committed, 2 attempt(s), 1 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  ConcurrencyError                          166  
+      2      1188      14  committed                                                   
+
+### Unsafe side effect [action_unsafe_side_effect] (6.2 s)
+    run #34 Inline call: committed, 3 attempt(s), 2 retry(ies), 3 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1015  rolled_back  SERIALIZATION_FAILURE    40001           1148  
+      2      2172    1016  rolled_back  SERIALIZATION_FAILURE    40001           2999  
+      3      6196      19  committed                                                   
+    outside world received 3 call(s):
+      run 34 attempt 1 via inline
+      run 34 attempt 2 via inline
+      run 34 attempt 3 via inline
+
+### Unsafe side effect, cr.commit() midway [action_commit_midway] (6.2 s)
+    run #35 cr.commit() midway: committed, 3 attempt(s), 2 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1026  rolled_back  SERIALIZATION_FAILURE    40001            179  Order SO042 confirmed and committed
+      2      1215    1028  rolled_back  SERIALIZATION_FAILURE    40001           3908  Order SO042 confirmed and committed
+      3      6160      26  committed                                                   Order SO042 confirmed and committed
+    rows: Order SO042 = 3, Customer statistics = 3
+
+### Safe side effect, postcommit [action_safe_side_effect] (5.5 s)
+    run #36 cr.postcommit: committed, 3 attempt(s), 2 retry(ies), 1 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  SERIALIZATION_FAILURE    40001           1777  
+      2      2799    1013  rolled_back  SERIALIZATION_FAILURE    40001           1623  
+      3      5444      11  committed                                                   
+
+### Safe side effect, outbox row [action_outbox_side_effect] (3.6 s)
+    run #37 Outbox row: committed, 3 attempt(s), 2 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  SERIALIZATION_FAILURE    40001           1065  
+      2      2087    1015  rolled_back  SERIALIZATION_FAILURE    40001            457  
+      3      3568      17  committed                                                   
+
+### Outbox delivery that crashes after sending [action_process_outbox] (0.0 s)
+    user sees: odoo.exceptions.UserError: Simulated crash after delivering order-8-confirmation-37: the message stays pending and the next delivery sends it again.
+    run #38 Outbox delivery: failed, 1 attempt(s), 0 retry(ies), 1 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0      17  rolled_back  UserError                                      
+
+### Outbox delivery, second try [action_process_outbox] (0.0 s)
+    run #39 Outbox delivery: committed, 1 attempt(s), 0 retry(ies), 1 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0      18  committed                                                   
+    outside world received 3 call(s):
+      run 36 attempt 3 via postcommit
+      run 38 attempt 1 via outbox, key order-8-confirmation-37
+      run 39 attempt 1 via outbox, key order-8-confirmation-37, ignored as duplicate
+
+### Counter, read-modify-write [action_counter_orm] (4.7 s)
+    run #40 Read-modify-write (ORM): committed, 18 attempt(s), 10 retry(ies), 0 external call(s), expected +8, got +8
+    request 1: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 2: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 3: 3 attempt(s): SERIALIZATION_FAILURE SERIALIZATION_FAILURE ok
+    request 4: 3 attempt(s): SERIALIZATION_FAILURE SERIALIZATION_FAILURE ok
+    request 5: 3 attempt(s): SERIALIZATION_FAILURE SERIALIZATION_FAILURE ok
+    request 6: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 7: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 8: 1 attempt(s): ok
+
+### Counter, SET value = value + 1 [action_counter_atomic] (2.1 s)
+    run #41 UPDATE ... SET value = value + 1: committed, 13 attempt(s), 5 retry(ies), 0 external call(s), expected +8, got +8
+    request 1: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 2: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 3: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 4: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 5: 1 attempt(s): ok
+    request 6: 2 attempt(s): SERIALIZATION_FAILURE ok
+    request 7: 1 attempt(s): ok
+    request 8: 1 attempt(s): ok
+
+### Counter, stale form value [action_counter_stale] (1.6 s)
+    run #42 Value read by an earlier transaction: committed, 8 attempt(s), 0 retry(ies), 0 external call(s), expected +8, got +1
+    request 1: 1 attempt(s): ok
+    request 2: 1 attempt(s): ok
+    request 3: 1 attempt(s): ok
+    request 4: 1 attempt(s): ok
+    request 5: 1 attempt(s): ok
+    request 6: 1 attempt(s): ok
+    request 7: 1 attempt(s): ok
+    request 8: 1 attempt(s): ok
+
+### Counter, insert-only ledger [action_counter_ledger] (0.1 s)
+    run #43 Insert-only ledger: committed, 8 attempt(s), 0 retry(ies), 0 external call(s), expected +8, got +8
+    request 1: 1 attempt(s): ok
+    request 2: 1 attempt(s): ok
+    request 3: 1 attempt(s): ok
+    request 4: 1 attempt(s): ok
+    request 5: 1 attempt(s): ok
+    request 6: 1 attempt(s): ok
+    request 7: 1 attempt(s): ok
+    request 8: 1 attempt(s): ok
+
+### Cron, Run Manually [action_cron_run_manually] (1.1 s)
+    user sees: error dialog, psycopg2.errors.SerializationFailure: could not serialize access due to concurrent update
+    run #44 Scheduled action: failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  SERIALIZATION_FAILURE    40001                 
+    job: active=True failure_count=1 first_failure=2026-10-12 14:30:12 batched failure_count=0
+
+### Cron, batched job with _commit_progress() [action_cron_batched] (1.1 s)
+    user sees: error dialog, psycopg2.errors.SerializationFailure: could not serialize access due to concurrent update
+    run #45 Batched job: committed, 4 attempt(s), 1 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0      15  committed                                                   Batch row 1, execution 1 of the job
+      2        19    1016  rolled_back  SERIALIZATION_FAILURE    40001                 Batch row 2, execution 1 of the job
+      3      1060      16  committed                                                   Batch row 2, execution 2 of the job
+      4      1079      16  committed                                                   Batch row 3, execution 2 of the job
+    job: active=True failure_count=1 first_failure=2026-10-12 14:30:12 batched failure_count=0
+
+### Cron, failure after a week of failures [action_cron_run_manually] (1.1 s)
+    user sees: error dialog, psycopg2.errors.SerializationFailure: could not serialize access due to concurrent update
+    run #46 Scheduled action: failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1013  rolled_back  SERIALIZATION_FAILURE    40001                 
+    job: active=False failure_count=0 first_failure=False batched failure_count=0
+
+### Cron, triggered for the cron worker [action_cron_trigger]
+    run #47 Scheduled action: failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0    1012  rolled_back  SERIALIZATION_FAILURE    40001                 
+    job: active=True failure_count=1 first_failure=2026-10-12 14:30:16 batched failure_count=0
+
+### Upload, seekable
+    HTTP 303 (redirect: success)
+    run #48 Seekable upload: committed, 2 attempt(s), 1 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0     513  rolled_back  SERIALIZATION_FAILURE    40001           1303  read 1300 bytes from the upload
+      2      1825      11  committed                                                   read 1300 bytes from the upload
+
+### Upload, non_seekable
+    HTTP 500
+    run #49 Non-seekable upload: failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0     513  rolled_back  SERIALIZATION_FAILURE    40001                 read 1300 bytes from the upload
+
+### Upload, non_seekable_integrity
+    HTTP 500
+    run #50 Non-seekable upload, unique violation: failed, 1 attempt(s), 0 retry(ies), 0 external call(s)
+    att  start ms  dur ms  state        error                    sqlstate  backoff ms  note
+      1         0       9  rolled_back  UNIQUE_VIOLATION         23505                 read 1300 bytes from the upload

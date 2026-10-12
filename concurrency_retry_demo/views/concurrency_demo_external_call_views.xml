@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="concurrency_demo_external_call_view_list" model="ir.ui.view">
+        <field name="name">concurrency.demo.external.call.list</field>
+        <field name="model">concurrency.demo.external.call</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" decoration-muted="is_duplicate">
+                <field name="received_at"/>
+                <field name="scenario_id"/>
+                <field name="run_id"/>
+                <field name="attempt_no"/>
+                <field name="channel"/>
+                <field name="payload"/>
+                <field name="idempotency_key" optional="show"/>
+                <field name="is_duplicate"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_external_call_view_search" model="ir.ui.view">
+        <field name="name">concurrency.demo.external.call.search</field>
+        <field name="model">concurrency.demo.external.call</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="scenario_id"/>
+                <field name="run_id"/>
+                <field name="idempotency_key"/>
+                <filter name="duplicates" string="Ignored duplicates" domain="[('is_duplicate', '=', True)]"/>
+                <group>
+                    <filter name="group_run" string="Run" context="{'group_by': 'run_id'}"/>
+                    <filter name="group_channel" string="Channel" context="{'group_by': 'channel'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="concurrency_demo_external_call_action" model="ir.actions.act_window">
+        <field name="name">Outside world</field>
+        <field name="res_model">concurrency.demo.external.call</field>
+        <field name="path">retry-demo-outside-world</field>
+        <field name="view_mode">list</field>
+    </record>
+
+</odoo>
